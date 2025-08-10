@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Block Dash - Play & Level Editor</title>
+<style>
+  body {
+    margin: 0; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    user-select: none;
+    background: #222;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  header {
+    display: flex;
+    justify-content: center;
+    position: relative;
+    background: #111;
+    padding: 10px 0;
+    border-bottom: 2px solid #444;
+  }
+  button.tab-btn {
+    background: #333;
+    border: none;
+    color: white;
+    padding: 10px 25px;
+    margin: 0 5px;
+    font-size: 1rem;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  button.tab-btn.active {
+    background: #4e54c8;
+  }
+  #reset-progress-btn {
+    position: absolute;
+    right: 15px;
+    top: 8px;
+    background: #c0392b;
+    border: none;
+    color: white;
+    padding: 7px 14px;
+    font-size: 0.9rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.3s;
+    user-select: none;
+  }
+  #reset-progress-btn:hover {
+    background: #e74c3c;
+  }
+  main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 15px;
+    background: #1e1e1e;
+  }
+  #level-select, #editor-level-list {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 15px;
+  }
+  .level-button, .editor-level-button {
+    background: #555;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    color: white;
+    border: 2px solid transparent;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .level-button.locked, .editor-level-button.locked {
+    background: #444;
+    color: #888;
+    cursor: default;
+  }
+  .level-button.selected, .editor-level-button.selected {
+    border-color: #fff;
+    background: #777;
+  }
+  #play-button, #save-level-btn, #new-level-btn {
+    margin-top: 10px;
+    background: #4e54c8;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    padding: 10px 22px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  #play-button:hover, #save-level-btn:hover, #new-level-btn:hover {
+    background: #3b3fc1;
+  }
+  #progress {
+    margin-top: 6px;
+    font-family: Consolas, monospace;
+    font-size: 18px;
+  }
+  #game-container {
+    position: relative;
+    width: 600px;
+    height: 300px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 0 30px #0009 inset;
+    background: #222;
+  }
+  canvas {
+    display: block;
+    border-radius: 12px;
+    background: linear-gradient(to bottom, #6dd5fa, #2980b9);
+    cursor: pointer;
+  }
+
+  /* Editor styles */
+  #editor {
+    width: 620px;
+    max-width: 100%;
+    background: #333;
+    padding: 10px 12px;
+    border-radius: 12px;
+    box-sizing: border-box;
+  }
+  #editor-label {
+    margin-bottom: 6px;
+    font-size: 1.2rem;
+  }
+  #level-name-input {
+    width: 100%;
+    font-size: 1.1rem;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+  }
+  #spike-types {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .spike-type-btn {
+    background: #4e54c8;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-weight: bold;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.3s;
+  }
+  .spike-type-btn.selected {
+    background: #3b3fc1;
+  }
+  #timeline {
+    width: 100%;
+    height: 60px;
+    background: #222;
+    border-radius: 8px;
+    position: relative;
+    user-select: none;
+    overflow-x: scroll;
+    white-space: nowrap;
+    box-sizing: border-box;
+    padding: 5px 0;
+  }
+  .timeline-segment {
+    display: inline-block;
+    width: 25px;
+    height: 60px;
+    margin: 0 1px;
+    background: #555;
+    border-radius: 4px;
+    position: relative;
+    cursor: pointer;
+  }
+  .timeline-segment.selected {
+    background: #4e54c8;
+  }
+  .timeline-spikes {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 3px;
+  }
+  .timeline-spike {
+    width: 18px;
+    height: 18px;
+    clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    background: white;
+  }
+
+  /* Scrollbar for timeline */
+  #timeline::-webkit-scrollbar {
+    height: 8px;
+  }
+  #timeline::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 4px;
+  }
+
+  /* Checkbox for completed */
+  .completed-check {
+    color: #0f0;
+    font-weight: bold;
+  }
+
+  /* Speed selector and duration slider */
+  #speed-duration {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #speed-label, #duration-label {
+    font-weight: bold;
+  }
+  select, input[type=range] {
+    background: #555;
+    border: none;
+    color: white;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  input[type=range] {
+    width: 150px;
+  }
+
+  /* Responsive tweaks */
+  @media (max-width: 650px) {
+    #game-container, #editor {
+      width: 100%;
+    }
+    canvas {
+      width: 100%;
+      height: auto;
+    }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="tab-play" class="tab-btn active">Play Levels</button>
+  <button id="tab-editor" class="tab-btn">Level Editor</button>
+  <button id="reset-progress-btn" title="Reset progress">Reset Progress</button>
+</header>
+
+<main>
+  <!-- Play Tab -->
+  <section id="play-tab">
+    <div id="level-select"></div>
+    <button id="play-button" disabled>Play</button>
+    <div id="progress">Progress: 0%</div>
+    <div id="game-container">
+      <canvas id="game" width="600" height="300" tabindex="0" title="Click or tap to jump"></canvas>
+    </div>
+  </section>
+
+  <!-- Editor Tab -->
+  <section id="editor-tab" style="display:none;">
+    <button id="new-level-btn">New Level</button>
+    <div id="editor-level-list" style="margin: 10px 0;"></div>
+    <div id="editor" style="display:none;">
+      <label id="editor-label" for="level-name-input">Level Name:</label>
+      <input type="text" id="level-name-input" placeholder="Enter level name" />
+      <div id="speed-duration">
+        <div>
+          <label id="speed-label" for="speed-select">Speed:</label>
+          <select id="speed-select" title="Select speed">
+            <option value="slow">Slow (Numero Uno)</option>
+            <option value="medium" selected>Medium (Dive)</option>
+            <option value="fast">Fast (Blood)</option>
+          </select>
+        </div>
+        <div>
+          <label id="duration-label" for="duration-range">Duration (sec): <span id="duration-display">30</span></label><br/>
+          <input type="range" id="duration-range" min="2" max="60" value="30" />
+        </div>
+      </div>
+      <div id="spike-types">
+        <div class="spike-type-btn" data-count="1">1 Spike</div>
+        <div class="spike-type-btn" data-count="2">2 Spikes</div>
+        <div class="spike-type-btn" data-count="3">3 Spikes</div>
+        <div class="spike-type-btn" data-count="4">4 Spikes</div>
+      </div>
+      <div id="timeline"></div>
+      <button id="save-level-btn" disabled>Save Level</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  const tabPlay = document.getElementById('tab-play');
+  const tabEditor = document.getElementById('tab-editor');
+  const playTab = document.getElementById('play-tab');
+  const editorTab = document.getElementById('editor-tab');
+  const levelSelectDiv = document.getElementById('level-select');
+  const playBtn = document.getElementById('play-button');
+  const progressDisplay = document.getElementById('progress');
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const resetProgressBtn = document.getElementById('reset-progress-btn');
+
+  // Editor DOM
+  const newLevelBtn = document.getElementById('new-level-btn');
+  const editorLevelList = document.getElementById('editor-level-list');
+  const editorDiv = document.getElementById('editor');
+  const levelNameInput = document.getElementById('level-name-input');
+  const spikeTypeButtons = Array.from(document.querySelectorAll('.spike-type-btn'));
+  const timelineDiv = document.getElementById('timeline');
+  const saveLevelBtn = document.getElementById('save-level-btn');
+  const speedSelect = document.getElementById('speed-select');
+  const durationRange = document.getElementById('duration-range');
+  const durationDisplay = document.getElementById('duration-display');
+
+  const width = canvas.width;
+  const height = canvas.height;
+
+  const spikeWidth = 25;
+  const spikeHeight = 25;
+
+  // Speeds in px per frame (60fps)
+  const speedValues = {
+    slow: 3,    // Numero Uno
+    medium: 5,  // Dive
+    fast: 8     // Blood
+  };
+
+  let gameRunning = false;
+  let gameOver = false;
+  let startTime = 0;
+
+  const player = {
+    x: 80,
+    y: height - 40 - 30,
+    width: 30,
+    height: 30,
+    color: '#ffd700',
+    vy: 0,
+    gravity: 0.8,
+    jumpPower: -14,
+    onGround: true,
+    baseY: height - 40 - 30,
+  };
+
+  let spikeSpeedCurrent = speedValues.medium;  // Default speed for playing
+  let spikes = [];
+
+  let levels = [];
+  let beatenLevels = new Set();
+
+  let currentLevelIndex = 0;
+  let selectedLevel = null;
+
+  let editorSelectedLevelIndex = -1;
+  let selectedSpikeCount = 1;
+
+  // Level duration in ms (dynamic for custom)
+  let levelDuration = 31000;
+
+  // Timeline segment size in px
+  const segmentPx = 25;
+
+  function switchTab(tab) {
+    if (gameRunning) {
+      alert('Finish current game before switching tabs!');
+      return;
+    }
+    if (tab === 'play') {
+      playTab.style.display = 'block';
+      editorTab.style.display = 'none';
+      tabPlay.classList.add('active');
+      tabEditor.classList.remove('active');
+    } else {
+      playTab.style.display = 'none';
+      editorTab.style.display = 'block';
+      tabPlay.classList.remove('active');
+      tabEditor.classList.add('active');
+    }
+  }
+
+  tabPlay.addEventListener('click', () => switchTab('play'));
+  tabEditor.addEventListener('click', () => switchTab('editor'));
+
+  function saveLevels() {
+    localStorage.setItem('blockDashLevels', JSON.stringify(levels));
+  }
+
+  function saveBeaten() {
+    localStorage.setItem('blockDashBeaten', JSON.stringify(Array.from(beatenLevels)));
+  }
+
+  function loadBeaten() {
+    const stored = localStorage.getItem('blockDashBeaten');
+    if (stored) {
+      beatenLevels = new Set(JSON.parse(stored));
+    }
+  }
+
+  function loadLevels() {
+    const stored = localStorage.getItem('blockDashLevels');
+    if (stored) {
+      try {
+        levels = JSON.parse(stored);
+        // Validate and fix missing properties for custom levels
+        levels.forEach(lvl => {
+          if (!('custom' in lvl)) lvl.custom = false;
+          if (!('speed' in lvl)) lvl.speed = 'medium';
+          if (!('duration' in lvl)) lvl.duration = 31000;
+          if (!('spikes' in lvl)) lvl.spikes = [];
+        });
+        return;
+      } catch {
+        // Ignore parse errors
+      }
+    }
+    // If no saved levels or error, create defaults
+    levels = [
+      {
+        id: 'numeroUno',
+        name: 'Numero Uno',
+        custom: false,
+        speed: 'slow',
+        duration: 31000,
+        spikes: generateDefaultSpikes(30, 3, [1,2]),
+      },
+      {
+        id: 'dive',
+        name: 'Dive',
+        custom: false,
+        speed: 'medium',
+        duration: 31000,
+        spikes: generateDefaultSpikes(30, 5, [1,2,3]),
+      },
+      {
+        id: 'blood',
+        name: 'Blood',
+        custom: false,
+        speed: 'fast',
+        duration: 31000,
+        spikes: generateDefaultSpikes(30, 8, [2,3,4]),
+      }
+    ];
+    saveLevels();
+  }
+
+  // Generate spikes for default levels: evenly spaced but no spikes after 95% time
+  // seconds: level length seconds
+  // speedPx: how fast spikes move per frame (px/frame)
+  // spikeCounts: array of spike counts to randomly pick from
+  function generateDefaultSpikes(seconds, speedPx, spikeCounts) {
+    const spikes = [];
+    const fps = 60;
+    const totalFrames = seconds * fps;
+    const spikeIntervalFrames = Math.floor(fps * 1.2); // roughly one spike every 1.2 seconds
+    const lastAllowedFrame = Math.floor(totalFrames * 0.95);
+
+    for(let frame = 0; frame < lastAllowedFrame; frame += spikeIntervalFrames) {
+      const spikeCount = spikeCounts[Math.floor(Math.random() * spikeCounts.length)];
+      spikes.push({
+        pos: frame * (1000 / fps), // milliseconds
+        count: spikeCount
+      });
+    }
+    return spikes;
+  }
+
+  function renderLevelSelect() {
+    levelSelectDiv.innerHTML = '';
+    levels.forEach((level, i) => {
+      const btn = document.createElement('button');
+      btn.classList.add('level-button');
+      btn.textContent = level.name;
+
+      // Show checkmark if beaten
+      if (beatenLevels.has(level.id)) {
+        btn.textContent = '✅ ' + btn.textContent;
+      }
+
+      let unlocked = false;
+      if (level.custom) {
+        // Custom levels always unlocked
+        unlocked = true;
+      } else {
+        // Built-in levels unlocked by beating previous
+        if (i === 0) unlocked = true;
+        else if (beatenLevels.has(levels[i - 1].id)) unlocked = true;
+      }
+
+      if (!unlocked) {
+        btn.classList.add('locked');
+        btn.disabled = true;
+      }
+
+      btn.addEventListener('click', () => {
+        if (gameRunning) {
+          alert('Finish current game before switching levels!');
+          return;
+        }
+        selectedLevel = level;
+        currentLevelIndex = i;
+        renderLevelSelect();
+        playBtn.disabled = false;
+      });
+
+      if (selectedLevel === level) {
+        btn.classList.add('selected');
+      }
+
+      levelSelectDiv.appendChild(btn);
+    });
+  }
+
+  // Editor code below
+
+  function renderEditorLevelList() {
+    editorLevelList.innerHTML = '';
+    levels.forEach((level, i) => {
+      if (!level.custom) return; // only custom levels in editor list
+      const btn = document.createElement('button');
+      btn.classList.add('editor-level-button');
+      btn.textContent = level.name;
+      if (i === editorSelectedLevelIndex) btn.classList.add('selected');
+      btn.addEventListener('click', () => {
+        if (gameRunning) {
+          alert('Finish current game before editing levels!');
+          return;
+        }
+        editorSelectedLevelIndex = i;
+        loadLevelIntoEditor(level);
+        renderEditorLevelList();
+      });
+      editorLevelList.appendChild(btn);
+    });
+  }
+
+  function loadLevelIntoEditor(level) {
+    levelNameInput.value = level.name;
+    speedSelect.value = level.speed || 'medium';
+    durationRange.value = Math.floor(level.duration / 1000);
+    durationDisplay.textContent = durationRange.value;
+    timelineDiv.innerHTML = '';
+    selectedSpikeCount = 1;
+
+    // Build timeline: 1 segment per 1/60 sec
+    const totalSegments = Math.floor(level.duration / (1000 / 60));
+    for (let i = 0; i < totalSegments; i++) {
+      const seg = document.createElement('div');
+      seg.classList.add('timeline-segment');
+      seg.dataset.index = i;
+      // Show spikes if any
+      const spike = level.spikes.find(s => {
+        const start = Math.floor(s.pos / (1000/60));
+        return i === start;
+      });
+      if (spike) {
+        const spikesDiv = document.createElement('div');
+        spikesDiv.classList.add('timeline-spikes');
+        for(let c=0;c<spike.count;c++){
+          const sp = document.createElement('div');
+          sp.classList.add('timeline-spike');
+          spikesDiv.appendChild(sp);
+        }
+        seg.appendChild(spikesDiv);
+      }
+      timelineDiv.appendChild(seg);
+    }
+
+    editorDiv.style.display = 'block';
+    saveLevelBtn.disabled = false;
+    updateSpikeTypeSelection();
+  }
+
+  spikeTypeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedSpikeCount = parseInt(btn.dataset.count, 10);
+      updateSpikeTypeSelection();
+    });
+  });
+
+  function updateSpikeTypeSelection() {
+    spikeTypeButtons.forEach(btn => {
+      btn.classList.toggle('selected', parseInt(btn.dataset.count,10) === selectedSpikeCount);
+    });
+  }
+
+  timelineDiv.addEventListener('click', (e) => {
+    if (!editorDiv.style.display || editorDiv.style.display === 'none') return;
+    if (!e.target.classList.contains('timeline-segment')) return;
+    const idx = parseInt(e.target.dataset.index, 10);
+
+    // toggle spike at idx with selectedSpikeCount
+    const posMs = idx * (1000 / 60);
+
+    // Check if spike exists at this position
+    const existingIndex = levels[editorSelectedLevelIndex].spikes.findIndex(s => Math.floor(s.pos / (1000/60)) === idx);
+
+    if (existingIndex !== -1) {
+      // Remove spike
+      levels[editorSelectedLevelIndex].spikes.splice(existingIndex,1);
+    } else {
+      // Add spike
+      levels[editorSelectedLevelIndex].spikes.push({pos: posMs, count: selectedSpikeCount});
+    }
+    saveLevels();
+    loadLevelIntoEditor(levels[editorSelectedLevelIndex]);
+  });
+
+  levelNameInput.addEventListener('input', () => {
+    if (editorSelectedLevelIndex === -1) return;
+    levels[editorSelectedLevelIndex].name = levelNameInput.value.trim() || 'Untitled Level';
+    saveLevels();
+    renderEditorLevelList();
+  });
+
+  speedSelect.addEventListener('change', () => {
+    if (editorSelectedLevelIndex === -1) return;
+    levels[editorSelectedLevelIndex].speed = speedSelect.value;
+    saveLevels();
+  });
+
+  durationRange.addEventListener('input', () => {
+    durationDisplay.textContent = durationRange.value;
+    if (editorSelectedLevelIndex === -1) return;
+    levels[editorSelectedLevelIndex].duration = durationRange.value * 1000;
+    saveLevels();
+  });
+
+  saveLevelBtn.addEventListener('click', () => {
+    if (editorSelectedLevelIndex === -1) return;
+    // Nothing else needed because edits save live
+    alert('Level saved!');
+    renderLevelSelect();
+  });
+
+  newLevelBtn.addEventListener('click', () => {
+    if (gameRunning) {
+      alert('Finish current game before creating new levels!');
+      return;
+    }
+    const newLvl = {
+      id: 'custom-' + Date.now(),
+      name: 'New Custom Level',
+      custom: true,
+      speed: 'medium',
+      duration: 30000,
+      spikes: []
+    };
+    levels.push(newLvl);
+    editorSelectedLevelIndex = levels.length -1;
+    saveLevels();
+    renderEditorLevelList();
+    loadLevelIntoEditor(newLvl);
+  });
+
+  resetProgressBtn.addEventListener('click', () => {
+    if (gameRunning) {
+      alert('Finish current game before resetting progress!');
+      return;
+    }
+    if(confirm('Are you sure you want to reset all your progress? This will remove all level completions.')) {
+      beatenLevels.clear();
+      saveBeaten();
+      renderLevelSelect();
+      renderEditorLevelList();
+      alert('Progress reset!');
+    }
+  });
+
+  // Game logic
+
+  function resetGame() {
+    gameRunning = true;
+    gameOver = false;
+    startTime = performance.now();
+    spikes = [];
+    spikeSpeedCurrent = speedValues[selectedLevel.speed] || speedValues.medium;
+    levelDuration = selectedLevel.duration || 31000;
+    player.y = player.baseY;
+    player.vy = 0;
+    player.onGround = true;
+    progressDisplay.textContent = 'Progress: 0%';
+
+    // Prepare spikes for gameplay
+    spikes = selectedLevel.spikes
+      .map(s => ({...s, x: width + s.pos * (spikeSpeedCurrent / (1000/60))}))
+      .sort((a,b) => a.pos - b.pos);
+  }
+
+  function drawPlayer() {
+    ctx.fillStyle = player.color;
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+  }
+
+  function drawSpike(x, count) {
+    const baseY = height - 40; // ground
+    const spikeW = spikeWidth;
+    const spikeH = spikeHeight;
+    const gap = 5;
+    for (let i = 0; i < count; i++) {
+      const sx = x + i * (spikeW + gap);
+      ctx.fillStyle = 'white';
+      ctx.beginPath();
+      ctx.moveTo(sx + spikeW/2, baseY - spikeH);
+      ctx.lineTo(sx, baseY);
+      ctx.lineTo(sx + spikeW, baseY);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function gameLoop() {
+    const now = performance.now();
+    const elapsed = now - startTime;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Background color by level
+    if(selectedLevel.id === 'numeroUno'){
+      ctx.fillStyle = '#2980b9';
+    } else if(selectedLevel.id === 'dive'){
+      ctx.fillStyle = '#27ae60';
+    } else if(selectedLevel.id === 'blood'){
+      ctx.fillStyle = '#c0392b';
+    } else {
+      ctx.fillStyle = '#222'; // custom
+    }
+    ctx.fillRect(0,0,width,height);
+
+    // Draw ground
+    ctx.fillStyle = '#444';
+    ctx.fillRect(0, height-40, width, 40);
+
+    // Move and draw spikes
+    for (let spike of spikes) {
+      spike.x -= spikeSpeedCurrent;
+    }
+    // Remove spikes off screen left
+    while (spikes.length && spikes[0].x + (spikeWidth + 5) * spikes[0].count < 0) {
+      spikes.shift();
+    }
+
+    // Draw spikes
+    for (let spike of spikes) {
+      drawSpike(spike.x, spike.count);
+    }
+
+    // Player physics
+    if (!player.onGround) {
+      player.vy += player.gravity;
+      player.y += player.vy;
+      if (player.y >= player.baseY) {
+        player.y = player.baseY;
+        player.vy = 0;
+        player.onGround = true;
+      }
+    }
+
+    drawPlayer();
+
+    // Collision detection
+    for (let spike of spikes) {
+      // Spike hitbox approx:
+      // X: spike.x to spike.x + (spikeWidth + 5) * count
+      // Y: baseY - spikeHeight to baseY
+      const baseY = height - 40;
+      if (
+        player.x + player.width > spike.x &&
+        player.x < spike.x + (spikeWidth + 5) * spike.count &&
+        player.y + player.height > baseY - spikeHeight &&
+        player.y < baseY
+      ) {
+        // Hit spike
+        gameOver = true;
+        gameRunning = false;
+        progressDisplay.textContent = 'You died! Click Play to retry.';
+        return;
+      }
+    }
+
+    // Progress calculation
+    const progressPercent = Math.min(100, Math.floor((elapsed / levelDuration) * 100));
+    progressDisplay.textContent = 'Progress: ' + progressPercent + '%';
+
+    if (elapsed >= levelDuration) {
+      // Level complete
+      gameRunning = false;
+      gameOver = false;
+      progressDisplay.textContent = 'Level Complete! 🎉';
+
+      if (!beatenLevels.has(selectedLevel.id)) {
+        beatenLevels.add(selectedLevel.id);
+        saveBeaten();
+        renderLevelSelect();
+        renderEditorLevelList();
+      }
+      return;
+    }
+
+    if (gameRunning) {
+      requestAnimationFrame(gameLoop);
+    }
+  }
+
+  canvas.addEventListener('click', () => {
+    if (!gameRunning || gameOver) return;
+    if (player.onGround) {
+      player.vy = player.jumpPower;
+      player.onGround = false;
+    }
+  });
+
+  playBtn.addEventListener('click', () => {
+    if (!selectedLevel) {
+      alert('Select a level first!');
+      return;
+    }
+    resetGame();
+    requestAnimationFrame(gameLoop);
+  });
+
+  // Init
+  loadBeaten();
+  loadLevels();
+  renderLevelSelect();
+  renderEditorLevelList();
+
+  // Editor spike buttons select first by default
+  selectedSpikeCount = 1;
+  updateSpikeTypeSelection();
+
+})();
+</script>
+
+</body>
+</html>
