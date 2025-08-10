@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Mini Geometry Dash - Numero Uno</title>
+<style>
+  body {
+    margin: 0; 
+    background: linear-gradient(#4a90e2, #50e3c2);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #game, #editor {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: transparent;
+  }
+  canvas {
+    background: #222;
+    border-radius: 10px;
+    max-width: 100vw;
+    max-height: 60vh;
+    touch-action: manipulation;
+  }
+  #ui {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    background: #222a;
+    color: white;
+    padding: 10px;
+    box-sizing: border-box;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+    font-size: 14px;
+  }
+  button, input[type=number], input[type=range] {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    user-select: none;
+    cursor: pointer;
+  }
+  button {
+    background: #50e3c2;
+    color: #222;
+    font-weight: bold;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    background: #555;
+    height: 6px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #50e3c2;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+  }
+  #message {
+    position: fixed;
+    top: 12px;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+    font-size: 18px;
+    color: #fff;
+    text-shadow: 1px 1px 4px #000a;
+    pointer-events: none;
+  }
+  #progressPercent {
+    position: fixed;
+    top: 40px;
+    width: 100%;
+    text-align: center;
+    font-weight: bold;
+    font-size: 20px;
+    color: #fff;
+    text-shadow: 1px 1px 6px #000a;
+    pointer-events: none;
+    user-select: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="message"></div>
+<div id="progressPercent"></div>
+
+<div id="game">
+  <canvas id="gameCanvas" width="600" height="150"></canvas>
+</div>
+
+<div id="ui">
+  <button id="playBtn">Play Numero Uno</button>
+  <button id="editBtn">Level Editor</button>
+  <button id="resetBtn" style="display:none;">Reset Level</button>
+  
+  <div id="editorUI" style="display:none; width: 100%; max-width: 600px;">
+    <label>Speed: <input type="range" id="speedRange" min="1" max="10" step="0.1" value="3"></label>
+    <label>Length (seconds): <input type="number" id="lengthInput" min="10" max="60" step="1" value="20" style="width:60px;"></label>
+    <label>Spikes Count: <input type="number" id="spikeCount" min="0" max="30" step="1" value="15" style="width:60px;"></label>
+    <button id="generateLevelBtn">Generate Level</button>
+    <button id="saveLevelBtn">Save & Play</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const messageEl = document.getElementById('message');
+  const progressEl = document.getElementById('progressPercent');
+
+  // Game state
+  let gameRunning = false;
+  let gameOver = false;
+  let win = false;
+
+  // Player
+  const player = {
+    x: 50,
+    y: 0,
+    width: 30,
+    height: 30,
+    yVelocity: 0,
+    gravity: 0.8,
+    jumpStrength: -14,
+    grounded: false,
+  };
+
+  // Level data
+  let level = {
+    speed: 3,
+    lengthSec: 20, // default changed here to 20 seconds
+    spikes: [],
+  };
+
+  // Editor state
+  let editing = false;
+
+  // Spike sizes
+  const spikeWidth = 20;
+  const spikeHeight = 34; // 15% shorter (40 * 0.85 = 34)
+  const groundY = canvas.height - 40;
+
+  // Timing
+  let frames = 0;
+  let maxFrames = 0;
+
+  // Initialize default level: Numero Uno
+  function createDefaultLevel() {
+    level.speed = 3;
+    level.lengthSec = 20;
+    level.spikes = [];
+    const spikesCount = 15;
+    for (let i = 0; i < spikesCount; i++) {
+      let timeSec = 3 + i * ((level.lengthSec - 5) / spikesCount);
+      let posX = timeToX(timeSec);
+      level.spikes.push(posX);
+    }
+  }
+
+  function timeToX(timeSec) {
+    return timeSec * level.speed * 60;
+  }
+
+  function checkCollision(offsetX) {
+    for (let spikeX of level.spikes) {
+      let spikeScreenX = spikeX - offsetX;
+      if (
+        spikeScreenX < player.x + player.width &&
+        spikeScreenX + spikeWidth > player.x &&
+        player.y + player.height > groundY - spikeHeight
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function drawGround() {
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+  }
+
+  function drawPlayer() {
+    ctx.fillStyle = '#50e3c2';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+  }
+
+  function drawSpikes(offsetX) {
+    ctx.fillStyle = '#e94e4e';
+    level.spikes.forEach(spikeX => {
+      let screenX = spikeX - offsetX;
+      if (screenX + spikeWidth > 0 && screenX < canvas.width) {
+        ctx.beginPath();
+        ctx.moveTo(screenX, groundY);
+        ctx.lineTo(screenX + spikeWidth/2, groundY - spikeHeight);
+        ctx.lineTo(screenX + spikeWidth, groundY);
+        ctx.closePath();
+        ctx.fill();
+      }
+    });
+  }
+
+  function resetGame() {
+    gameRunning = true;
+    gameOver = false;
+    win = false;
+    frames = 0;
+    player.y = groundY - player.height;
+    player.yVelocity = 0;
+    player.grounded = true;
+    maxFrames = Math.floor(level.lengthSec * 60);
+    messageEl.textContent = '';
+    progressEl.textContent = '0% Completed';
+    resetBtn.style.display = 'inline-block';
+  }
+
+  function gameLoop() {
+    if (!gameRunning) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let offsetX = frames * level.speed;
+
+    // Update player physics
+    player.yVelocity += player.gravity;
+    player.y += player.yVelocity;
+
+    // Ground collision
+    if (player.y + player.height >= groundY) {
+      player.y = groundY - player.height;
+      player.yVelocity = 0;
+      player.grounded = true;
+    } else {
+      player.grounded = false;
+    }
+
+    drawGround();
+    drawSpikes(offsetX);
+    drawPlayer();
+
+    // Update progress percent display
+    let percent = Math.min(100, Math.floor((frames / maxFrames) * 100));
+    progressEl.textContent = percent + '% Completed';
+
+    if (checkCollision(offsetX)) {
+      gameOver = true;
+      gameRunning = false;
+      messageEl.textContent = "💥 You hit a spike! Tap Play to try again.";
+      resetBtn.style.display = 'none';
+      progressEl.textContent = '';
+      return;
+    }
+
+    frames++;
+
+    if (frames > maxFrames) {
+      gameRunning = false;
+      win = true;
+      messageEl.textContent = "🎉 Level Complete! Tap Play to replay.";
+      resetBtn.style.display = 'none';
+      progressEl.textContent = '100% Completed';
+      return;
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  function jump() {
+    if (gameRunning && player.grounded) {
+      player.yVelocity = player.jumpStrength;
+      player.grounded = false;
+    }
+  }
+
+  // Input events
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    jump();
+  });
+
+  canvas.addEventListener('mousedown', e => {
+    e.preventDefault();
+    jump();
+  });
+
+  // UI Elements
+  const playBtn = document.getElementById('playBtn');
+  const editBtn = document.getElementById('editBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const editorUI = document.getElementById('editorUI');
+  const speedRange = document.getElementById('speedRange');
+  const lengthInput = document.getElementById('lengthInput');
+  const spikeCountInput = document.getElementById('spikeCount');
+  const generateLevelBtn = document.getElementById('generateLevelBtn');
+  const saveLevelBtn = document.getElementById('saveLevelBtn');
+
+  function generateSpikes(count, lengthSec, speed) {
+    const spikes = [];
+    for (let i = 0; i < count; i++) {
+      const time = 3 + Math.random() * (lengthSec - 5);
+      spikes.push(timeToX(time));
+    }
+    spikes.sort((a,b) => a - b);
+    return spikes;
+  }
+
+  function drawEditorSpikes(spikes) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGround();
+    spikes.forEach(spikeX => {
+      if (spikeX + spikeWidth > 0 && spikeX < canvas.width) {
+        ctx.fillStyle = '#e94e4e';
+        ctx.beginPath();
+        ctx.moveTo(spikeX, groundY);
+        ctx.lineTo(spikeX + spikeWidth/2, groundY - spikeHeight);
+        ctx.lineTo(spikeX + spikeWidth, groundY);
+        ctx.closePath();
+        ctx.fill();
+      }
+    });
+    ctx.fillStyle = '#50e3c2';
+    ctx.fillRect(player.x, groundY - player.height, player.width, player.height);
+  }
+
+  generateLevelBtn.addEventListener('click', () => {
+    const speed = parseFloat(speedRange.value);
+    const lengthSec = parseInt(lengthInput.value);
+    const spikeCount = parseInt(spikeCountInput.value);
+
+    if (lengthSec < 10 || lengthSec > 60) {
+      alert("Length must be between 10 and 60 seconds.");
+      return;
+    }
+    if (speed < 1 || speed > 10) {
+      alert("Speed must be between 1 and 10.");
+      return;
+    }
+    if (spikeCount < 0 || spikeCount > 30) {
+      alert("Spike count must be between 0 and 30.");
+      return;
+    }
+
+    const spikes = generateSpikes(spikeCount, lengthSec, speed);
+    drawEditorSpikes(spikes);
+  });
+
+  saveLevelBtn.addEventListener('click', () => {
+    const speed = parseFloat(speedRange.value);
+    const lengthSec = parseInt(lengthInput.value);
+    const spikeCount = parseInt(spikeCountInput.value);
+
+    level.speed = speed;
+    level.lengthSec = lengthSec;
+    level.spikes = generateSpikes(spikeCount, lengthSec, speed);
+
+    resetGame();
+    editing = false;
+    editorUI.style.display = 'none';
+    gameLoop();
+  });
+
+  playBtn.addEventListener('click', () => {
+    editing = false;
+    editorUI.style.display = 'none';
+    resetBtn.style.display = 'inline-block';
+    createDefaultLevel();
+    resetGame();
+    gameLoop();
+  });
+
+  editBtn.addEventListener('click', () => {
+    editing = true;
+    messageEl.textContent = '';
+    resetBtn.style.display = 'none';
+    editorUI.style.display = 'flex';
+    gameRunning = false;
+    gameOver = false;
+    win = false;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGround();
+    speedRange.value = 3;
+    lengthInput.value = 20;
+    spikeCountInput.value = 15;
+    drawEditorSpikes([]);
+    progressEl.textContent = '';
+  });
+
+  resetBtn.addEventListener('click', () => {
+    if (!editing) {
+      resetGame();
+      gameLoop();
+      messageEl.textContent = '';
+      progressEl.textContent = '0% Completed';
+    }
+  });
+
+  createDefaultLevel();
+  resetGame();
+  messageEl.textContent = "Tap or click the screen to jump. Avoid the spikes!";
+})();
+</script>
+
+</body>
+</html>
