@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+<title>Mini Geometry Dash - Level Creator</title>
+<style>
+  body {
+    margin: 0; 
+    background: linear-gradient(#4a90e2, #50e3c2);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    color: white;
+  }
+  #container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 8px;
+  }
+  #levelSelect {
+    margin-bottom: 10px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .level-btn {
+    background: #50e3c2;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #222;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+  }
+  .level-btn.selected {
+    background: #33bba5;
+  }
+  .checkmark {
+    color: green;
+    font-weight: bold;
+  }
+  #gameCanvas {
+    background: #222;
+    border-radius: 10px;
+    width: 100%;
+    max-height: 220px;
+    touch-action: manipulation;
+    display: block;
+    margin: 0 auto 10px;
+  }
+  #message, #progressPercent {
+    text-align: center;
+    font-weight: bold;
+    font-size: 18px;
+    text-shadow: 1px 1px 4px #000a;
+    user-select: none;
+  }
+  #progressPercent {
+    font-size: 20px;
+    margin-top: -10px;
+    margin-bottom: 8px;
+  }
+  #controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  button, input[type=number], input[type=text], select {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+    user-select: none;
+    cursor: pointer;
+  }
+  button {
+    background: #50e3c2;
+    color: #222;
+    font-weight: bold;
+  }
+  input[type=range] {
+    -webkit-appearance: none;
+    background: #555;
+    height: 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    width: 150px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #50e3c2;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+  label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    user-select: none;
+  }
+  #editorUI {
+    background: #222a;
+    padding: 10px;
+    border-radius: 10px;
+    max-width: 700px;
+    margin: 0 auto 20px;
+  }
+  #timeline {
+    background: #444;
+    height: 60px;
+    margin-top: 10px;
+    border-radius: 8px;
+    position: relative;
+    user-select: none;
+  }
+  .spike-marker {
+    position: absolute;
+    bottom: 0;
+    width: 20px;
+    height: 34px;
+    cursor: pointer;
+  }
+  .spike-single {
+    background: url('data:image/svg+xml;utf8,<svg width="20" height="34" viewBox="0 0 20 34" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 34 L10 0 L20 34 Z" fill="%23e94e4e"/></svg>') no-repeat center bottom;
+    background-size: contain;
+  }
+  .spike-double {
+    background: url('data:image/svg+xml;utf8,<svg width="40" height="34" viewBox="0 0 40 34" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M0 34 L10 0 L20 34 Z M20 34 L30 0 L40 34 Z" fill="%23e94e4e"/></svg>') no-repeat center bottom;
+    background-size: contain;
+    width: 40px !important;
+  }
+  #spikeTypeSelect {
+    margin-left: 8px;
+  }
+  #levelNameInput {
+    width: 180px;
+  }
+</style>
+</head>
+<body>
+
+<div id="container">
+
+  <div id="levelSelect" aria-label="Select Level">
+    <!-- Level buttons appear here -->
+  </div>
+
+  <canvas id="gameCanvas" width="600" height="150" aria-label="Game canvas"></canvas>
+
+  <div id="progressPercent" aria-live="polite" aria-atomic="true"></div>
+  <div id="message" aria-live="polite" aria-atomic="true"></div>
+
+  <div id="controls">
+    <button id="playBtn">Play</button>
+    <button id="editBtn">Edit Level</button>
+    <button id="resetBtn" style="display:none;">Reset</button>
+    <button id="saveLevelBtn" style="display:none;">Save Level</button>
+  </div>
+
+  <div id="editorUI" style="display:none;" aria-label="Level Editor">
+    <label>
+      Level Name:
+      <input type="text" id="levelNameInput" maxlength="20" placeholder="Enter level name (max 20 chars)" />
+    </label>
+    <label>
+      Speed:
+      <input type="range" id="speedRange" min="1" max="10" step="0.1" value="3" aria-valuemin="1" aria-valuemax="10" aria-valuenow="3"/>
+      <span id="speedValue">3.0</span>
+    </label>
+    <label>
+      Length (seconds):
+      <input type="number" id="lengthInput" min="10" max="60" step="1" value="20" style="width:60px;" aria-valuemin="10" aria-valuemax="60" aria-valuenow="20" />
+    </label>
+    <label>
+      Spike Type:
+      <select id="spikeTypeSelect" aria-label="Spike type select">
+        <option value="single">Single Spike</option>
+        <option value="double">Double Spikes</option>
+      </select>
+    </label>
+
+    <div id="timeline" aria-label="Spike placement timeline" role="slider" tabindex="0"></div>
+    <small style="display:block; text-align:center; margin-top:4px;">Click timeline to place spikes. Drag spikes to move or click to remove.</small>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  // Elements
+  const levelSelectDiv = document.getElementById('levelSelect');
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const messageEl = document.getElementById('message');
+  const progressEl = document.getElementById('progressPercent');
+  const playBtn = document.getElementById('playBtn');
+  const editBtn = document.getElementById('editBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const saveLevelBtn = document.getElementById('saveLevelBtn');
+  const editorUI = document.getElementById('editorUI');
+  const speedRange = document.getElementById('speedRange');
+  const speedValue = document.getElementById('speedValue');
+  const lengthInput = document.getElementById('lengthInput');
+  const spikeTypeSelect = document.getElementById('spikeTypeSelect');
+  const levelNameInput = document.getElementById('levelNameInput');
+  const timeline = document.getElementById('timeline');
+
+  // Constants
+  const MAX_LEVELS = 3;
+  const spikeWidth = 20;
+  const spikeHeight = 34; // 15% shorter from 40
+  const groundY = canvas.height - 40;
+
+  // Game and Editor state
+  let levels = []; // array of {name, speed, lengthSec, spikes: [{x,time,type}]}
+  let progress = {}; // beaten level indexes as keys (true)
+
+  let currentLevelIndex = 0;
+  let editing = false;
+  let gameRunning = false;
+  let gameOver = false;
+  let win = false;
+
+  // Player
+  const player = {
+    x: 50,
+    y: 0,
+    width: 30,
+    height: 30,
+    yVelocity: 0,
+    gravity: 0.8,
+    jumpStrength: -14,
+    grounded: false,
+  };
+
+  // Gameplay timing
+  let frames = 0;
+  let maxFrames = 0;
+
+  // Timeline width
+  const timelineWidth = timeline.clientWidth;
+
+  // Util: Save/load localStorage
+  function saveData() {
+    try {
+      localStorage.setItem('miniGD_levels', JSON.stringify(levels));
+      localStorage.setItem('miniGD_progress', JSON.stringify(progress));
+    } catch(e) {
+      console.warn('LocalStorage save failed:', e);
+    }
+  }
+  function loadData() {
+    try {
+      const lvls = localStorage.getItem('miniGD_levels');
+      const prog = localStorage.getItem('miniGD_progress');
+      if (lvls) levels = JSON.parse(lvls);
+      else createDefaultLevels();
+      if (prog) progress = JSON.parse(prog);
+      else progress = {};
+    } catch(e) {
+      createDefaultLevels();
+      progress = {};
+    }
+  }
+
+  // Default level
+  function createDefaultLevels() {
+    levels = [{
+      name: "Numero Uno",
+      speed: 3,
+      lengthSec: 20,
+      spikes: generateSpikesAuto(15, 20, 3, "single"),
+    }];
+    // fill empty slots with placeholders for new custom levels
+    for(let i=1; i<MAX_LEVELS; i++) {
+      levels.push({
+        name: `Custom Level ${i}`,
+        speed: 3,
+        lengthSec: 20,
+        spikes: [],
+      });
+    }
+  }
+
+  // Auto spike generator for default level only
+  function generateSpikesAuto(count, lengthSec, speed, type) {
+    const spikes = [];
+    for (let i = 0; i < count; i++) {
+      let timeSec = 3 + i * ((lengthSec - 5) / count);
+      spikes.push({time: timeSec, type});
+    }
+    return spikes;
+  }
+
+  // Convert time to X position on level timeline or canvas
+  function timeToX(time, speed, lengthSec) {
+    return (time / lengthSec) * (speed * lengthSec * 60);
+  }
+
+  function xToTime(x, speed, lengthSec) {
+    return (x / (speed * lengthSec * 60)) * lengthSec;
+  }
+
+  // Draw ground
+  function drawGround() {
+    ctx.fillStyle = '#333';
+    ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+  }
+
+  // Draw player
+  function drawPlayer() {
+    ctx.fillStyle = '#50e3c2';
+    ctx.fillRect(player.x, player.y, player.width, player.height);
+  }
+
+  // Draw spikes (single and double) on canvas (during gameplay)
+  function drawSpikes(offsetX) {
+    levels[currentLevelIndex].spikes.forEach(spike => {
+      const spikeX = spike.time * levels[currentLevelIndex].speed * 60;
+      let screenX = spikeX - offsetX;
+
+      if (screenX + spikeWidth * (spike.type === "double" ? 2 : 1) > 0 && screenX < canvas.width) {
+        ctx.fillStyle = '#e94e4e';
+        if(spike.type === "single") {
+          drawSpikeShape(screenX, groundY, spikeWidth, spikeHeight);
+        } else {
+          // double spikes side by side
+          drawSpikeShape(screenX, groundY, spikeWidth, spikeHeight);
+          drawSpikeShape(screenX + spikeWidth, groundY, spikeWidth, spikeHeight);
+        }
+      }
+    });
+  }
+
+  function drawSpikeShape(x, y, width, height) {
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + width/2, y - height);
+    ctx.lineTo(x + width, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Check collisions
+  function checkCollision(offsetX) {
+    const px = player.x;
+    const py = player.y;
+    const pw = player.width;
+    const ph = player.height;
+
+    for (const spike of levels[currentLevelIndex].spikes) {
+      const spikeX = spike.time * levels[currentLevelIndex].speed * 60;
+      const widthSpike = spikeWidth * (spike.type === "double" ? 2 : 1);
+      const spikeY = groundY - spikeHeight;
+      const spikeRect = {
+        x: spikeX - offsetX,
+        y: spikeY,
+        w: widthSpike,
+        h: spikeHeight,
+      };
+
+      // AABB collision
+      if (px < spikeRect.x + spikeRect.w &&
+          px + pw > spikeRect.x &&
+          py + ph > spikeRect.y) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Game reset
+  function resetGame() {
+    gameRunning = true;
+    gameOver = false;
+    win = false;
+    frames = 0;
+    player.y = groundY - player.height;
+    player.yVelocity = 0;
+    player.grounded = true;
+    maxFrames = Math.floor(levels[currentLevelIndex].lengthSec * 60);
+    messageEl.textContent = '';
+    progressEl.textContent = '0% Completed';
+    resetBtn.style.display = 'inline-block';
+  }
+
+  // Game loop
+  function gameLoop() {
+    if (!gameRunning) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    let offsetX = frames * levels[currentLevelIndex].speed;
+
+    // Player physics
+    player.yVelocity += player.gravity;
+    player.y += player.yVelocity;
+
+    if (player.y + player.height >= groundY) {
+      player.y = groundY - player.height;
+      player.yVelocity = 0;
+      player.grounded = true;
+    } else {
+      player.grounded = false;
+    }
+
+    drawGround();
+    drawSpikes(offsetX);
+    drawPlayer();
+
+    // Update progress
+    let percent = Math.min(100, Math.floor((frames / maxFrames) * 100));
+    progressEl.textContent = percent + '% Completed';
+
+    // Check collisions
+    if (checkCollision(offsetX)) {
+      gameOver = true;
+      gameRunning = false;
+      messageEl.textContent = "💥 You hit a spike! Tap Play to try again.";
+      resetBtn.style.display = 'none';
+      progressEl.textContent = '';
+      return;
+    }
+
+    frames++;
+
+    // Win condition
+    if (frames > maxFrames) {
+      gameRunning = false;
+      win = true;
+      messageEl.textContent = "🎉 Level Complete! Tap Play to replay.";
+      resetBtn.style.display = 'none';
+      progressEl.textContent = '100% Completed';
+      // Save progress
+      progress[currentLevelIndex] = true;
+      saveData();
+      renderLevelSelect();
+      return;
+    }
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Jump logic
+  function jump() {
+    if (gameRunning && player.grounded) {
+      player.yVelocity = player.jumpStrength;
+      player.grounded = false;
+    }
+  }
+
+  // Input listeners
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if(!editing) jump();
+  });
+  canvas.addEventListener('mousedown', e => {
+    e.preventDefault();
+    if(!editing) jump();
+  });
+
+  // LEVEL SELECT UI
+  function renderLevelSelect() {
+    levelSelectDiv.innerHTML = '';
+    for(let i=0; i<MAX_LEVELS; i++) {
+      const btn = document.createElement('button');
+      btn.classList.add('level-btn');
+      if(i === currentLevelIndex) btn.classList.add('selected');
+
+      const lvl = levels[i];
+      btn.textContent = lvl.name || `Level ${i+1}`;
+
+      if(progress[i]) {
+        const check = document.createElement('span');
+        check.textContent = '✓';
+        check.className = 'checkmark';
+        btn.appendChild(check);
+      }
+
+      btn.onclick = () => {
+        if(gameRunning) return;
+        currentLevelIndex = i;
+        editing = false;
+        editorUI.style.display = 'none';
+        resetBtn.style.display = 'none';
+        messageEl.textContent = '';
+        progressEl.textContent = '';
+        renderLevelSelect();
+        resetGame();
+        drawGround();
+      };
+      levelSelectDiv.appendChild(btn);
+    }
+  }
+
+  // EDITOR LOGIC
+  let timelineWidthPx = 0;
+
+  function renderTimeline() {
+    timeline.innerHTML = '';
+    timelineWidthPx = timeline.clientWidth;
+    const lvl = levels[currentLevelIndex];
+
+    lvl.spikes.forEach((spike, idx) => {
+      const spikeDiv = document.createElement('div');
+      spikeDiv.classList.add('spike-marker');
+      spikeDiv.classList.add(spike.type === 'double' ? 'spike-double' : 'spike-single');
+
+      // Position by time percent
+      const timeRatio = spike.time / lvl.lengthSec;
+      const posX = timeRatio * timelineWidthPx;
+      spikeDiv.style.left = (posX - (spike.type === 'double' ? 20 : 10)) + 'px'; // center align
+
+      spikeDiv.title = `${spike.type} spike at ${spike.time.toFixed(2)}s`;
+
+      // Drag & drop support
+      spikeDiv.draggable = true;
+      spikeDiv.dataset.index = idx;
+
+      // Remove spike on click
+      spikeDiv.addEventListener('click', e => {
+        e.stopPropagation();
+        lvl.spikes.splice(idx,1);
+        renderTimeline();
+      });
+
+      spikeDiv.addEventListener('dragstart', e => {
+        e.dataTransfer.setData('text/plain', idx);
+      });
+
+      timeline.appendChild(spikeDiv);
+    });
+  }
+
+  // Place spike on timeline click
+  timeline.addEventListener('click', e => {
+    const rect = timeline.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+
+    const lvl = levels[currentLevelIndex];
+    const spikeType = spikeTypeSelect.value;
+
+    // Convert clickX to time
+    const time = (clickX / timelineWidthPx) * lvl.lengthSec;
+
+    // Add spike
+    lvl.spikes.push({time: time, type: spikeType});
+    lvl.spikes.sort((a,b) => a.time - b.time);
+    renderTimeline();
+  });
+
+  // Drag & drop reposition spikes on timeline
+  timeline.addEventListener('dragover', e => {
+    e.preventDefault();
+  });
+
+  timeline.addEventListener('drop', e => {
+    e.preventDefault();
+    const idx = +e.dataTransfer.getData('text/plain');
+    const rect = timeline.getBoundingClientRect();
+    const dropX = e.clientX - rect.left;
+
+    const lvl = levels[currentLevelIndex];
+    if(idx >= 0 && idx < lvl.spikes.length) {
+      lvl.spikes[idx].time = (dropX / timelineWidthPx) * lvl.lengthSec;
+      if(lvl.spikes[idx].time < 0) lvl.spikes[idx].time = 0;
+      if(lvl.spikes[idx].time > lvl.lengthSec) lvl.spikes[idx].time = lvl.lengthSec;
+      lvl.spikes.sort((a,b) => a.time - b.time);
+      renderTimeline();
+    }
+  });
+
+  // UI updates on input
+  speedRange.addEventListener('input', () => {
+    speedValue.textContent = parseFloat(speedRange.value).toFixed(1);
+  });
+
+  // Play button
+  playBtn.addEventListener('click', () => {
+    if(editing) return;
+    resetBtn.style.display = 'inline-block';
+    resetGame();
+    gameLoop();
+  });
+
+  // Edit button
+  editBtn.addEventListener('click', () => {
+    editing = true;
+    resetBtn.style.display = 'none';
+    messageEl.textContent = 'Editing level spikes: click timeline to add spikes, click spike to remove.';
+    progressEl.textContent = '';
+    editorUI.style.display = 'block';
+
+    // Load level data into editor fields
+    const lvl = levels[currentLevelIndex];
+    levelNameInput.value = lvl.name;
+    speedRange.value = lvl.speed;
+    speedValue.textContent = lvl.speed.toFixed(1);
+    lengthInput.value = lvl.lengthSec;
+    spikeTypeSelect.value = 'single';
+
+    renderTimeline();
+
+    // Clear canvas and draw ground + spikes for preview
+    drawEditorPreview();
+  });
+
+  // Reset button
+  resetBtn.addEventListener('click', () => {
+    if(editing) return;
+    resetGame();
+    gameLoop();
+    messageEl.textContent = '';
+    progressEl.textContent = '0% Completed';
+  });
+
+  // Save level button
+  saveLevelBtn.addEventListener('click', () => {
+    if(!editing) return;
+
+    const name = levelNameInput.value.trim();
+    if(name.length === 0) {
+      alert("Please enter a level name.");
+      return;
+    }
+    if(name.length > 20) {
+      alert("Level name max 20 characters.");
+      return;
+    }
+    const speed = parseFloat(speedRange.value);
+    const lengthSec = parseInt(lengthInput.value);
+
+    if(speed < 1 || speed > 10) {
+      alert("Speed must be between 1 and 10.");
+      return;
+    }
+    if(lengthSec < 10 || lengthSec > 60) {
+      alert("Length must be between 10 and 60 seconds.");
+      return;
+    }
+
+    const lvl = levels[currentLevelIndex];
+
+    // Clamp spike times inside lengthSec
+    lvl.spikes.forEach(spike => {
+      if(spike.time > lengthSec) spike.time = lengthSec;
+      if(spike.time < 0) spike.time = 0;
+    });
+
+    lvl.name = name;
+    lvl.speed = speed;
+    lvl.lengthSec = lengthSec;
+
+    saveData();
+    editing = false;
+    editorUI.style.display = 'none';
+    messageEl.textContent = '';
+    resetBtn.style.display = 'none';
+    progressEl.textContent = '';
+    renderLevelSelect();
+  });
+
+  // Preview spikes in editor on canvas
+  function drawEditorPreview() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGround();
+    const lvl = levels[currentLevelIndex];
+    const offsetX = 0;
+    drawSpikes(offsetX);
+    // Draw player at rest position
+    ctx.fillStyle = '#50e3c2';
+    ctx.fillRect(player.x, groundY - player.height, player.width, player.height);
+  }
+
+  // Update editor preview when editor values change
+  [speedRange, lengthInput, spikeTypeSelect, levelNameInput].forEach(elem => {
+    elem.addEventListener('change', () => {
+      if(editing) {
+        drawEditorPreview();
+      }
+    });
+  });
+
+  // Initialize game state
+  loadData();
+  renderLevelSelect();
+  resetGame();
+  drawGround();
+  messageEl.textContent = "Tap/click to jump. Select a level and press Play!";
+  progressEl.textContent = '';
+
+})();
+</script>
+
+</body>
+</html>
